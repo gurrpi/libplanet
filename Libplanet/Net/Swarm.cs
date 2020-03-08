@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AsyncIO;
 using Bencodex.Types;
+using K4os.Compression.LZ4;
 using Libplanet.Action;
 using Libplanet.Blockchain;
 using Libplanet.Blocks;
@@ -26,7 +27,7 @@ using Serilog.Events;
 
 namespace Libplanet.Net
 {
-    public class Swarm<T> : IDisposable
+public class Swarm<T> : IDisposable
         where T : IAction, new()
     {
         private const int InitialBlockDownloadWindow = 100;
@@ -946,7 +947,16 @@ namespace Libplanet.Net
                     foreach (byte[] payload in payloads)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        Block<T> block = Block<T>.Deserialize(payload);
+                        byte[] decompressed = new byte[payload.Length * 255];
+                        int decodedLength = LZ4Codec.Decode(
+                            payload,
+                            0,
+                            payload.Length,
+                            decompressed,
+                            0,
+                            decompressed.Length);
+                        Array.Resize(ref decompressed, decodedLength);
+                        Block<T> block = Block<T>.Deserialize(decompressed);
 
                         yield return block;
                     }
@@ -1884,8 +1894,19 @@ namespace Libplanet.Net
                 if (_store.ContainsBlock(hash))
                 {
                     Block<T> block = _store.GetBlock<T>(hash);
-                    byte[] payload = block.Serialize();
-                    blocks.Add(payload);
+                    byte[] serializedBlock = block.Serialize();
+
+                    byte[] compressed =
+                    new byte[LZ4Codec.MaximumOutputSize(serializedBlock.Length)];
+                    int encodedLength = LZ4Codec.Encode(
+                        serializedBlock,
+                        0,
+                        serializedBlock.Length,
+                        compressed,
+                        0,
+                        compressed.Length);
+                    Array.Resize(ref compressed, encodedLength);
+                    blocks.Add(compressed);
                 }
 
                 if (blocks.Count == getData.ChunkSize)
@@ -2041,7 +2062,7 @@ namespace Libplanet.Net
                 }
             }
 
-            var reply = new RecentStates(
+            var reply = new Messages.RecentStates(
                 target,
                 nextOffset,
                 iteration,

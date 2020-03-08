@@ -65,6 +65,7 @@ https://docs.libplanet.io/</Description>
     <PackageReference Include="Fody" Version="5.0.1">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="K4os.Compression.LZ4" Version="1.1.11" />
     <PackageReference Include="LiteDB" Version="4.1.4" />
     <PackageReference Include="LruCacheNet" Version="1.2.0" />
     <PackageReference Include="Menees.Analyzers.2017" Version="2.0.3">
